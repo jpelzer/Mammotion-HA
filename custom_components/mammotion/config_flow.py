@@ -138,7 +138,7 @@ class MammotionConfigFlow(ConfigFlow, domain=DOMAIN):
                 self._discovered_device.name: format_mac(
                     self._discovered_device.address
                 ),
-                **entry.data.get(CONF_BLE_DEVICES, None),
+                **entry.data.get(CONF_BLE_DEVICES, {}),
             }
             self._abort_if_unique_id_configured(updates={CONF_BLE_DEVICES: merged})
 
@@ -175,7 +175,7 @@ class MammotionConfigFlow(ConfigFlow, domain=DOMAIN):
                     self._config = {
                         CONF_BLE_DEVICES: {device.name: format_mac(address)}
                     }
-            return await self.async_step_wifi(user_input)
+            return await self.async_step_wifi(None)
 
         current_addresses = self._async_current_ids()
         for discovery_info in async_discovered_service_info(self.hass):
