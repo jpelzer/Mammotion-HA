@@ -165,6 +165,16 @@ class MammotionConfigFlow(ConfigFlow, domain=DOMAIN):
         """Handle the user step to pick discovered device."""
 
         if user_input is not None:
+            # The picked address is only carried here; async_step_wifi reads just
+            # the credentials, so record it now or the entry is created without
+            # CONF_BLE_DEVICES and BLE is never attached.
+            if address := user_input.get(CONF_ADDRESS):
+                device = bluetooth.async_ble_device_from_address(self.hass, address)
+                if device is not None and device.name:
+                    self._discovered_device = device
+                    self._config = {
+                        CONF_BLE_DEVICES: {device.name: format_mac(address)}
+                    }
             return await self.async_step_wifi(user_input)
 
         current_addresses = self._async_current_ids()

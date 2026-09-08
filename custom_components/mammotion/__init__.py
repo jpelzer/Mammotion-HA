@@ -228,6 +228,12 @@ async def _attach_ble_to_mower(
     )
     if ble_device:
         await mammotion.add_ble_to_device(device.device_name, ble_device)
+    else:
+        LOGGER.info(
+            "BLE device %s (%s) not in range at startup — will attach when seen",
+            device.device_name,
+            ble_address,
+        )
 
     _device_name = device.device_name
 
@@ -463,6 +469,16 @@ async def async_setup_entry(hass: HomeAssistant, entry: MammotionConfigEntry) ->
                     mammotion,
                     device,
                     device_ble_address,
+                )
+                _register_ble_reconnect_callback(
+                    hass, entry, mammotion, device.device_name, device_ble_address
+                )
+            else:
+                LOGGER.info(
+                    "No Bluetooth address stored for %s — running cloud-only. "
+                    "Known Bluetooth devices: %s",
+                    device.device_name,
+                    sorted(addresses) or "none",
                 )
 
             if not use_wifi:
