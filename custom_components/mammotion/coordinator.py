@@ -100,6 +100,7 @@ MAINTENANCE_INTERVAL = timedelta(minutes=60)
 DEFAULT_INTERVAL = timedelta(minutes=30)
 REPORT_INTERVAL = timedelta(minutes=5)
 DYNAMICS_LINE_INTERVAL = timedelta(seconds=10)
+RTK_REFRESH_INTERVAL = timedelta(seconds=15)
 DEVICE_VERSION_INTERVAL = timedelta(weeks=1)
 MAP_INTERVAL = timedelta(minutes=60)
 RTK_INTERVAL = timedelta(hours=5)
@@ -334,6 +335,13 @@ class MammotionBaseUpdateCoordinator[DataT](DataUpdateCoordinator[DataT]):  # ty
             if ble.is_usable:
                 return True
         return bool(not handle.availability.mqtt_reported_offline)
+
+    def _ble_is_connected(self) -> bool:
+        """Return True if BLE transport exists and is currently connected."""
+        if handle := self.manager.mower(self.device_name):
+            if ble := handle.get_transport(TransportType.BLE):
+                return ble.is_connected
+        return False
 
     @property
     def mqtt_transport_connected(self) -> bool:
@@ -1533,6 +1541,8 @@ class MammotionBaseUpdateCoordinator[DataT](DataUpdateCoordinator[DataT]):  # ty
 class MammotionReportUpdateCoordinator(MammotionBaseUpdateCoordinator[MowingDevice]):
     """Mammotion report update coordinator."""
 
+    _rtk_refresh_cancel: CALLBACK_TYPE | None = None
+
     def __init__(
         self,
         hass: HomeAssistant,
@@ -1773,6 +1783,46 @@ class MammotionReportUpdateCoordinator(MammotionBaseUpdateCoordinator[MowingDevi
                 lambda s: s.raw.report_data.dev.sys_status,
                 self._on_sys_status_changed_refresh,
             )
+
+        self._rtk_refresh_cancel = async_track_time_interval(
+            self.hass, self._async_refresh_rtk, RTK_REFRESH_INTERVAL
+        )
+
+    async def _async_refresh_rtk(self, _now: datetime.datetime) -> None:
+        """Refresh report_data.rtk over BLE.
+
+        The BLE report stream subscribes to _REPORT_CHANNELS, which omits
+        RIT_RTK, so the RTK block stays frozen at whatever the connect-time
+        get_report_cfg returned.  get_report_cfg covers the full channel list
+        including RIT_RTK.  BLE-only, so this never spends cloud API quota.
+        """
+        if not self._ble_is_connected():
+            return
+        if self.data.report_data.dev.sys_status in NO_REQUEST_MODES:
+            return
+        try:
+            await self.manager.send_command_with_args(
+                self.device_name,
+                "get_report_cfg",
+                prefer_ble=True,
+                skip_if_saga_active=True,
+                _record_cmd=False,
+            )
+        except (
+            DeviceOfflineException,
+            NoTransportAvailableError,
+            GatewayTimeoutException,
+            CommandTimeoutError,
+            ConcurrentRequestError,
+        ):
+            pass
+
+    async def async_shutdown(self) -> None:
+        """Cancel the RTK refresh timer, then shut down."""
+        if self._rtk_refresh_cancel is not None:
+            self._rtk_refresh_cancel()
+            self._rtk_refresh_cancel = None
+        await super().async_shutdown()
 
     async def _on_sys_status_changed_refresh(self, sys_status: int) -> None:
         """Trigger a one-shot count=1 poll on sys_status transitions when not streaming."""
@@ -2081,13 +2131,6 @@ class MammotionMapUpdateCoordinator(MammotionBaseUpdateCoordinator[MowerInfo]):
         return DeviceType.value_of_str(self.device_name).is_support_dynamics_line(
             firmware
         )
-
-    def _ble_is_connected(self) -> bool:
-        """Return True if BLE transport exists and is currently connected."""
-        if handle := self.manager.mower(self.device_name):
-            if ble := handle.get_transport(TransportType.BLE):
-                return ble.is_connected
-        return False
 
     def _stop_dynamics_line_poll(self) -> None:
         if self._dynamics_line_cancel is not None:
