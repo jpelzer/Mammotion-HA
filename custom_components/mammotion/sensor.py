@@ -32,7 +32,7 @@ from pymammotion.data.model.device import (
     PoolCleanerDevice,
     RTKBaseStationDevice,
 )
-from pymammotion.data.model.enums import RTKStatus, TaskAreaStatus
+from pymammotion.data.model.enums import PositionMode, RTKStatus, TaskAreaStatus
 from pymammotion.data.model.pool_state import SpinoSysStatus, SpinoWorkMode
 from pymammotion.utility.constant import VioState
 from pymammotion.utility.constant.device_constant import (
@@ -105,6 +105,17 @@ class MowerDataFormatter:
             return "Not set"
 
         return f"{MowerDataFormatter.format_time(start)} - {MowerDataFormatter.format_time(end)}"
+
+
+def _rapid_state_live(mower_data: MowingDevice) -> bool:
+    """Return True once the rapid-state tunnel has delivered a frame.
+
+    ``mowing_state`` is all-zero until the first ``system_tard_state_tunnel``
+    frame and stays stale while docked, where the tunnel is silent.
+    ``satellites_total`` is never 0 on a real fix, so it gates the whole block —
+    ``pos_level`` cannot, since 0 there means FIX.
+    """
+    return mower_data.mowing_state.satellites_total > 0
 
 
 @dataclass(frozen=True, kw_only=True)
@@ -272,7 +283,11 @@ SENSOR_TYPES: tuple[MammotionSensorEntityDescription, ...] = (
         state_class=SensorStateClass.MEASUREMENT,
         device_class=None,
         native_unit_of_measurement=None,
-        value_fn=lambda mower_data: mower_data.report_data.rtk.gps_stars,
+        value_fn=lambda mower_data: (
+            mower_data.mowing_state.satellites_total
+            if _rapid_state_live(mower_data)
+            else mower_data.report_data.rtk.gps_stars
+        ),
         entity_category=EntityCategory.DIAGNOSTIC,
     ),
     MammotionSensorEntityDescription(
@@ -337,7 +352,11 @@ SENSOR_TYPES: tuple[MammotionSensorEntityDescription, ...] = (
         state_class=SensorStateClass.MEASUREMENT,
         device_class=None,
         native_unit_of_measurement=None,
-        value_fn=lambda mower_data: mower_data.report_data.rtk.pos_level,
+        value_fn=lambda mower_data: (
+            mower_data.mowing_state.pos_level
+            if _rapid_state_live(mower_data)
+            else mower_data.report_data.rtk.pos_level
+        ),
         entity_category=EntityCategory.DIAGNOSTIC,
     ),
     MammotionSensorEntityDescription(
@@ -368,7 +387,9 @@ SENSOR_TYPES: tuple[MammotionSensorEntityDescription, ...] = (
         device_class=SensorDeviceClass.ENUM,
         native_unit_of_measurement=None,
         value_fn=lambda mower_data: str(
-            RTKStatus.from_value(mower_data.report_data.rtk.status)
+            PositionMode.from_value(mower_data.mowing_state.pos_level)
+            if _rapid_state_live(mower_data)
+            else RTKStatus.from_value(mower_data.report_data.rtk.status)
         ),
         entity_category=EntityCategory.DIAGNOSTIC,
     ),
