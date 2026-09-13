@@ -1342,7 +1342,7 @@ wheels = [
 
 [[package]]
 name = "mammotion-ha"
-version = "0.6.5b1"
+version = "0.6.5b8"
 source = { virtual = "." }
 dependencies = [
     { name = "autotyping" },
@@ -1365,7 +1365,7 @@ dev = [
 requires-dist = [
     { name = "autotyping", specifier = ">=24.3.0" },
     { name = "homeassistant", specifier = ">=2026.1.0" },
-    { name = "pymammotion", specifier = "==0.9.0b3" },
+    { name = "pymammotion", specifier = "==0.9.0b5" },
     { name = "sdp-transform", specifier = ">=1.1.0" },
     { name = "websockets", specifier = ">=15.0.1" },
 ]
@@ -1863,7 +1863,7 @@ wheels = [
 
 [[package]]
 name = "pymammotion"
-version = "0.9.0b3"
+version = "0.9.0b5"
 source = { registry = "https://pypi.org/simple" }
 dependencies = [
     { name = "aiohttp" },
@@ -1888,9 +1888,9 @@ dependencies = [
     { name = "webrtc-models" },
     { name = "websockets" },
 ]
-sdist = { url = "https://files.pythonhosted.org/packages/2d/cc/f39b33cdd418a3ffe9ec942dcf0aa8fcaf475c2bc786aa657a678c9fd4d8/pymammotion-0.9.0b3.tar.gz", hash = "sha256:d3fe81ade97d36d17c2accba3c4d3e0e4684bc671d6ef80ec4eb6d1904290fa7", size = 471781, upload-time = "2026-09-09T02:23:24.416Z" }
+sdist = { url = "https://files.pythonhosted.org/packages/00/8f/ef3a067e04f73447243d494c80a318a347c56cc1aebb8a5924b9a5cf63b9/pymammotion-0.9.0b5.tar.gz", hash = "sha256:72b6e74c525af1b71e2f0c652c9a9a50c8b449e7e31bd42e9b2caf1edadd768a", size = 674327, upload-time = "2026-09-12T09:24:38.936Z" }
 wheels = [
-    { url = "https://files.pythonhosted.org/packages/74/67/ae92e9580b72972f3a767ebfd0caaac28693d8c4fa97281d89664d3cb190/pymammotion-0.9.0b3-py3-none-any.whl", hash = "sha256:a1584a937ebe5a12a058a55daaaa8c29b32e99d6190fe092720743d16af6b133", size = 548560, upload-time = "2026-09-09T02:23:22.266Z" },
+    { url = "https://files.pythonhosted.org/packages/c3/41/956687108f21114c4abd55e82ecda41a22b42d527770726394ad069a192f/pymammotion-0.9.0b5-py3-none-any.whl", hash = "sha256:b59c9c5c6c6980e66c4a668e820457780c148d30295f6e50979d83c0ed94838e", size = 751595, upload-time = "2026-09-12T09:24:37.12Z" },
 ]
 
 [[package]]
