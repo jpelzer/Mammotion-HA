@@ -2,6 +2,7 @@
 
 from __future__ import annotations
 
+import asyncio
 from asyncio import CancelledError
 from contextlib import suppress
 from datetime import datetime
@@ -22,7 +23,6 @@ from homeassistant.exceptions import (
     ConfigEntryAuthFailed,
     ConfigEntryError,
     ConfigEntryNotReady,
-    HomeAssistantError,
 )
 from homeassistant.helpers import aiohttp_client
 from homeassistant.helpers.device_registry import DeviceEntry
@@ -338,7 +338,17 @@ async def _await_device_connection(
     try:
         await handle.wait_until_connected(timeout=60, mqtt_stable_for=10)
     except CancelledError:
-        raise HomeAssistantError("Setup cancelled, transport connection timed out")
+        # bleak_retry_connector cancels its own sleep when the proxy has no free
+        # connection slot.  Only a genuine task cancellation should propagate;
+        # otherwise continue without BLE rather than failing setup outright.
+        task = asyncio.current_task()
+        if task is not None and task.cancelling() > 0:
+            raise
+        LOGGER.info(
+            "BLE connection for %s was cancelled (no free slot) — "
+            "continuing setup without it",
+            device_name,
+        )
     return True
 
 

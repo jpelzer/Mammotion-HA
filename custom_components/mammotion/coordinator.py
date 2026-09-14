@@ -1594,8 +1594,15 @@ class MammotionBaseUpdateCoordinator[DataT](DataUpdateCoordinator[DataT]):  # ty
 
         handle = self.manager.mower(self.device_name)
 
+        # _attach_ble_to_mower sets ble_mac before this runs and restore_device
+        # replaces the device wholesale, so carry the MAC over — every BLE
+        # recovery path keys off it.
+        existing = self.manager.get_device_by_name(self.device_name)
+        ble_mac = existing.mower_state.ble_mac if existing is not None else ""
+
         if restored_data is None:
             empty = MowingDevice()
+            empty.mower_state.ble_mac = ble_mac
             self.data = empty
             if handle is not None:
                 handle.restore_device(empty)
@@ -1604,11 +1611,14 @@ class MammotionBaseUpdateCoordinator[DataT](DataUpdateCoordinator[DataT]):  # ty
         try:
             if restored_data is not None:
                 mower_state = MowingDevice().from_dict(restored_data)
+                if ble_mac and not mower_state.mower_state.ble_mac:
+                    mower_state.mower_state.ble_mac = ble_mac
                 if handle is not None:
                     handle.restore_device(mower_state)
                     self.data = mower_state
         except InvalidFieldValue:
             empty = MowingDevice()
+            empty.mower_state.ble_mac = ble_mac
             self.data = empty
             if handle is not None:
                 handle.restore_device(empty)
@@ -1950,7 +1960,8 @@ class MammotionReportUpdateCoordinator(MammotionBaseUpdateCoordinator[MowingDevi
                     self.hass,
                     self._async_handle_bluetooth_event,
                     BluetoothCallbackMatcher(
-                        address=self.data.mower_state.ble_mac, connectable=True
+                        address=self.data.mower_state.ble_mac.upper(),
+                        connectable=True,
                     ),
                     BluetoothScanningMode.ACTIVE,
                 )
@@ -1987,7 +1998,8 @@ class MammotionReportUpdateCoordinator(MammotionBaseUpdateCoordinator[MowingDevi
                     self.hass,
                     self._async_handle_bluetooth_event,
                     BluetoothCallbackMatcher(
-                        address=self.data.mower_state.ble_mac, connectable=True
+                        address=self.data.mower_state.ble_mac.upper(),
+                        connectable=True,
                     ),
                     BluetoothScanningMode.ACTIVE,
                 )
@@ -2313,7 +2325,7 @@ class MammotionDeviceVersionUpdateCoordinator(
                 except DeviceOfflineException:
                     pass
 
-            if not device.mower_state.wifi_mac:
+            if not device.mower_state.wifi_mac or not device.mower_state.ble_mac:
                 await self.async_send_command("get_device_network_info")
 
             handle = self.manager.mower(self.device_name)
