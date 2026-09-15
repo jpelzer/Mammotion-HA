@@ -534,14 +534,13 @@ class MammotionBaseUpdateCoordinator[DataT](DataUpdateCoordinator[DataT]):  # ty
         handle = self.manager.mower(self.device_name)
         if handle is None:
             return
+        # set_cloud_attached detaches this handle instead of disconnecting: the
+        # cloud transports are one object per account, so disconnecting them for
+        # one mower takes cloud down for every other mower on the account.
+        with contextlib.suppress(TransportError):
+            await self.manager.set_cloud_attached(self.device_name, attached=enabled)
         if enabled:
-            for t_type in (TransportType.CLOUD_ALIYUN, TransportType.CLOUD_MAMMOTION):
-                with contextlib.suppress(TransportError):
-                    await handle.connect_transport(t_type)
             await handle.restart_keep_alive()
-        else:
-            for t_type in (TransportType.CLOUD_ALIYUN, TransportType.CLOUD_MAMMOTION):
-                await handle.disconnect_transport(t_type)
 
     async def async_refresh_login(self, exc: Exception | None = None) -> None:
         """Refresh whichever credentials the failure actually implicates.
@@ -1551,6 +1550,14 @@ class MammotionBaseUpdateCoordinator[DataT](DataUpdateCoordinator[DataT]):  # ty
         if DeviceType.is_luba1(self.device_name):
             route_information.toward_mode = 0
             route_information.toward_included_angle = 0
+        firmware = getattr(
+            getattr(self.data, "device_firmwares", None), "device_version", ""
+        )
+        if not DeviceType.supports_auto_change_direction(
+            self.device_name, firmware or ""
+        ):
+            # The app gates this row on a capability list and firmware; match it.
+            route_information.auto_change_direction = 0
         return route_information
 
     async def async_plan_route(
